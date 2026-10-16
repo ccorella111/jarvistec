@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JarvisTEC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<header>
+  <h1>JarvisTEC</h1>
+  <label class="api"><span class="dot" id="dot"></span> API
+    <input type="text" id="api" size="26" aria-label="API URL">
+    <button id="btnApi">Connect</button>
+  </label>
+</header>
+
+<main>
+  <section>
+    <h2>Camera and emotion</h2>
+    <video id="video" autoplay playsinline muted></video>
+    <div class="row">
+      <button id="btnCam">Turn on camera</button>
+      <button id="btnEmo" class="main">Detect emotion</button>
+      <label><input type="checkbox" id="auto"> every 10 s</label>
+    </div>
+    <div id="emo">No analysis yet</div>
+  </section>
+
+  <section class="core">
+    <h2>Voice assistant</h2>
+    <button id="mic" aria-label="Record a voice command">Speak</button>
+    <div id="heard">Tap the circle, say your command and tap it again.</div>
+    <div class="row">
+      <input type="text" id="txt" placeholder='Type: "JarvisTEC, bitcoin price"' style="flex:1">
+      <button id="btnTxt" class="main">Send</button>
+    </div>
+    <div id="resp">The answer will appear here.</div>
+  </section>
+
+  <section>
+    <h2>Models</h2>
+    <div id="mods">Connect to the API to see the models.</div>
+    <textarea id="json" aria-label="Model input (JSON)" spellcheck="false" style="height: 250px;"></textarea>
+    <div class="row"><button id="btnRun" class="main">Run model</button><span id="selName" style="color:var(--dim)"></span></div>
+  </section>
+</main>
+
+<div id="log" aria-live="polite"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const EMOTIONS = {happiness: "Happiness", sadness: "Sadness", anger: "Anger", surprise: "Surprise", fear: "Fear",
+                  disgust: "Disgust", contempt: "Contempt", neutral: "Neutral", joy: "Happiness", sorrow: "Sadness"};
+let API = location.port === "8000" ? location.origin : "http://localhost:8000";
+let selectedModel = null, stream = null, recorder = null, chunks = [], autoTimer = null;
+if (location.port !== "8000") { try { API = localStorage.getItem("jarvis_api") || API; } catch (e) {} }
+$("api").value = API;
+
+function log(msg, isError) {
+  const d = document.createElement("div");
+  if (isError) d.className = "err";
+  d.textContent = new Date().toLocaleTimeString() + "  " + msg;
+  $("log").prepend(d);
+}
+
+async function call(path, opts) {
+  try {
+    const r = await fetch(API + path, opts);
+    if (!r.ok) throw new Error("HTTP " + r.status + " " + (await r.text()).slice(0, 200));
+    return await r.json();
+  } catch (e) {
+    log(e.message.startsWith("HTTP") ? e.message : "Could not reach " + API + ". Is uvicorn running?", true);
+    throw e;
+  }
+}
+
+function speak(t) {
+  if (!("speechSynthesis" in window) || !t) return;
+  const u = new SpeechSynthesisUtterance(t); u.lang = "en-US";
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+
+function summary(res) {
+  if (!res) return "";
+  const v = res.prediction ?? JSON.stringify(res);
+  return v + (res.unit ? " " + res.unit : "");
+}
+
+function showCommand(c) {
+  if (!c.model) { $("resp").textContent = c.message; speak(c.message); return; }
+  if (!c.result) { $("resp").textContent = c.message; speak(c.message); return; }
+  const phrase = "Model " + c.model + ": " + summary(c.result);
+  $("resp").textContent = phrase + "\n\n" + JSON.stringify(c.result, null, 2) + (c.default_input_used ? "\n(example input)" : "");
+  speak(phrase);
+}
+
+/* ---------- API and models ---------- */
+async function connect() {
+  API = $("api").value.replace(/\/$/, "");
+  try { localStorage.setItem("jarvis_api", API); } catch (e) {}
+  try {
+    const s = await call("/"); $("dot").className = "dot ok";
+    log("API connected. Models loaded: " + s.models_loaded);
+    const models = await call("/models"), box = $("mods"); box.innerHTML = "";
+    const sel = document.createElement("select"); sel.id = "modelSelect"; sel.setAttribute("aria-label", "Model");
+    sel.add(new Option("Select a model...", ""));
+    models.forEach(m => sel.add(new Option(m.name, m.name)));
+    const desc = document.createElement("small"); desc.className = "mod-desc";
+    sel.onchange = () => {
+      const m = models.find(x => x.name === sel.value);
+      selectedModel = m ? m.name : null;
+      $("json").value = m ? JSON.stringify(m.example_input, null, 2) : "";
+      desc.textContent = m ? m.description : "";
+      $("selName").textContent = m ? m.name : "";
+    };
+    box.append(sel, desc);
+  } catch (e) { $("dot").className = "dot"; }
+}
+
+async function runModel() {
+  if (!selectedModel) return log("Select a model first.", true);
+  let payload; try { payload = JSON.parse($("json").value || "{}"); } catch (e) { return log("The input JSON is not valid.", true); }
+  const r = await call("/predict/" + selectedModel, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const phrase = "Model " + selectedModel + ": " + summary(r);
+  $("resp").textContent = phrase + "\n\n" + JSON.stringify(r, null, 2); speak(phrase);
+}
+
+/* ---------- Camera and emotion ---------- */
+async function toggleCamera() {
+  if (stream) {                                   // camera is on -> turn it off
+    stream.getTracks().forEach(t => t.stop());    // releases the camera (the browser's light goes out)
+    stream = null; $("video").srcObject = null;
+    clearInterval(autoTimer); $("auto").checked = false;   // stop automatic detection too
+    $("btnCam").textContent = "Turn on camera"; log("Camera off.");
+    return;
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    $("video").srcObject = stream; $("btnCam").textContent = "Turn off camera"; log("Camera on.");
+  } catch (e) { log("Could not open the camera: " + e.message, true); }
+}
+
+async function detectEmotion() {
+  const v = $("video");
+  if (!stream || !v.videoWidth) return log("Turn on the camera first.", true);
+  const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext("2d").drawImage(v, 0, 0);
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.9));
+  const fd = new FormData(); fd.append("image", blob, "frame.jpg");
+  const r = await call("/emotion", { method: "POST", body: fd });
+  if (!r.emotion) { $("emo").textContent = "No face detected"; return; }
+  $("emo").innerHTML = ""; $("emo").append(EMOTIONS[r.emotion] || r.emotion);
+  const s = document.createElement("small"); s.textContent = "Confidence " + Math.round(r.confidence * 100) + "%" + (r.mock ? " (simulated)" : "");
+  $("emo").appendChild(s);
+}
+
+/* ---------- Voice ---------- */
+async function toWav16k(blob) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const audio = await ctx.decodeAudioData(await blob.arrayBuffer()); ctx.close();
+  const off = new OfflineAudioContext(1, Math.ceil(audio.duration * 16000), 16000);
+  const src = off.createBufferSource(); src.buffer = audio; src.connect(off.destination); src.start();
+  const pcm = (await off.startRendering()).getChannelData(0), n = pcm.length;
+  const v = new DataView(new ArrayBuffer(44 + n * 2));
+  const w = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 16000, true); v.setUint32(28, 32000, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) { const x = Math.max(-1, Math.min(1, pcm[i])); v.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true); }
+  return new Blob([v], { type: "audio/wav" });
+}
+
+async function toggleRecording() {
+  if (recorder && recorder.state === "recording") { recorder.stop(); return; }
+  try {
+    const a = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recorder = new MediaRecorder(a); chunks = [];
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = async () => {
+      a.getTracks().forEach(t => t.stop()); $("mic").classList.remove("on"); $("mic").textContent = "Speak";
+      $("heard").textContent = "Processing…";
+      const fd = new FormData();
+      try { fd.append("audio", await toWav16k(new Blob(chunks, { type: recorder.mimeType })), "voice.wav"); }
+      catch (e) { return log("Could not convert the audio to WAV: " + e.message, true); }
+      const r = await call("/voice/command", { method: "POST", body: fd });
+      $("heard").textContent = r.transcription.text ? "I heard: " + r.transcription.text : "The audio was not understood.";
+      showCommand(r.command);
+    };
+    recorder.start(); $("mic").classList.add("on"); $("mic").textContent = "Listening"; $("heard").textContent = "Recording… tap again to send.";
+  } catch (e) { log("Could not open the microphone: " + e.message, true); }
+}
+
+async function sendText() {
+  const t = $("txt").value.trim(); if (!t) return;
+  $("heard").textContent = "You typed: " + t;
+  showCommand(await call("/command", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: t }) }));
+}
+
+$("btnApi").onclick = connect; $("btnCam").onclick = toggleCamera; $("btnEmo").onclick = () => detectEmotion().catch(() => {});
+$("mic").onclick = toggleRecording; $("btnTxt").onclick = () => sendText().catch(() => {}); $("btnRun").onclick = () => runModel().catch(() => {});
+$("txt").onkeydown = e => { if (e.key === "Enter") $("btnTxt").click(); };
+$("auto").onchange = e => { clearInterval(autoTimer); if (e.target.checked) autoTimer = setInterval(() => detectEmotion().catch(() => {}), 10000); };
+connect();
+</script>
+</body>
+</html>

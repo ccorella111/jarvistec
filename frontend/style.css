@@ -1,0 +1,302 @@
+/* ==========================================================================
+   JarvisTEC - interface styles (cyan HUD theme on a dark background)
+   Loaded from index.html with <link rel="stylesheet" href="style.css">
+   ========================================================================== */
+
+/* ---------- Color variables (change them here to re-theme) ---------- */
+:root {
+  --bg: #040c14;      /* page background */
+  --panel: #071a26;   /* panel background */
+  --line: #0f4a5e;    /* borders */
+  --cy: #3de8ff;      /* main color (cyan) */
+  --dim: #7fb8c4;     /* secondary text */
+  --tx: #d4f3f9;      /* main text */
+  --warn: #ffb347;    /* warnings and errors */
+}
+
+/* ---------- Base ---------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(ellipse at 50% 0, #0a2a3a 0, var(--bg) 60%) fixed;
+  color: var(--tx);
+  font: 500 17px/1.4 Rajdhani, "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+h1,
+h2 {
+  font-family: Orbitron, "Segoe UI", sans-serif;
+  font-weight: 500;
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.5rem;
+  color: var(--cy);
+  letter-spacing: 0.08em;
+}
+
+h2 {
+  font-size: 0.95rem;
+  color: var(--cy);
+  margin-bottom: 0.7rem;
+}
+
+/* ---------- Header and API status ---------- */
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.api {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--dim);
+}
+
+.dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--warn);
+}
+
+.dot.ok {
+  background: #4dff9d;
+  box-shadow: 0 0 8px #4dff9d;
+}
+
+/* ---------- Main layout (3 columns) ---------- */
+main {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap: 1rem;
+  padding: 1rem 1.4rem;
+}
+
+section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.6rem 0;
+}
+
+/* ---------- Form controls ---------- */
+input,
+textarea,
+button {
+  font: inherit;
+  color: var(--tx);
+  background: #03121b;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+}
+
+input[type=text],
+textarea {
+  width: 100%;
+}
+
+textarea {
+  font-family: Consolas, monospace;
+  font-size: 0.85rem;
+  min-height: 7rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--cy);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--cy);
+  outline-offset: 2px;
+}
+
+button.main {
+  background: var(--cy);
+  color: #02222c;
+  border-color: var(--cy);
+  font-weight: 600;
+}
+
+/* ---------- Left panel: camera and emotion ---------- */
+video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: 4px;
+  object-fit: cover;
+  transform: scaleX(-1);          /* mirror effect */
+}
+
+#emo {
+  font-family: Orbitron, sans-serif;
+  font-size: 1.4rem;
+  color: var(--cy);
+  min-height: 2rem;
+}
+
+#emo small {
+  display: block;
+  font: 500 0.95rem Rajdhani, sans-serif;
+  color: var(--dim);
+}
+
+/* ---------- Center panel: voice assistant ---------- */
+.core {
+  text-align: center;
+}
+
+#mic {                            /* round reactor-style button */
+  width: 11rem;
+  height: 11rem;
+  border-radius: 50%;
+  margin: 0.6rem auto;
+  display: grid;
+  place-items: center;
+  position: relative;
+  background: radial-gradient(circle, #bff8ff 0, var(--cy) 18%, #0a5a6e 40%, #03121b 70%);
+  border: 2px solid var(--cy);
+  box-shadow: 0 0 24px #3de8ff55;
+  color: #02222c;
+  font-weight: 700;
+}
+
+#mic::before {                    /* outer ring */
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  border: 2px dashed var(--line);
+}
+
+#mic.on {                         /* while recording */
+  box-shadow: 0 0 40px var(--cy);
+  animation: pulse 1s infinite alternate;
+}
+
+#mic.on::before {
+  border-color: var(--cy);
+  animation: spin 6s linear infinite;
+}
+
+@keyframes pulse {
+  to { transform: scale(1.05); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #mic.on,
+  #mic.on::before {
+    animation: none;
+  }
+}
+
+#heard {
+  color: var(--dim);
+  min-height: 1.5rem;
+}
+
+#resp {
+  text-align: left;
+  background: #03121b;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.7rem;
+  min-height: 5rem;
+  white-space: pre-wrap;
+  font-size: 0.95rem;
+}
+
+/* ---------- Right panel: model list ---------- */
+.mod {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 0.4rem;
+}
+
+.mod small {
+  display: block;
+  color: var(--dim);
+}
+
+.mod.sel {
+  border-color: var(--cy);
+}
+
+/* ---------- Model select ---------- */
+#modelSelect {
+  width: 100%;
+  font: inherit;
+  color: var(--tx);
+  background: #03121b;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+#modelSelect:focus-visible {
+  outline: 2px solid var(--cy);
+  outline-offset: 2px;
+}
+
+.mod-desc {
+  display: block;
+  color: var(--dim);
+  min-height: 1.4rem;
+  margin-bottom: 0.6rem;
+}
+
+/* ---------- Event log ---------- */
+#log {
+  margin: 0 1.4rem 1.4rem;
+  max-height: 9rem;
+  overflow: auto;
+  font: 0.85rem Consolas, monospace;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.6rem;
+  background: var(--panel);
+}
+
+#log .err {
+  color: var(--warn);
+}
+
+/* ---------- Responsive: a single column on narrow screens ---------- */
+@media (max-width: 900px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+}
