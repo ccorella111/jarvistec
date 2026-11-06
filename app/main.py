@@ -8,11 +8,18 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.registry import REGISTRY, load_models
 from app.routers import command, emotion, models, voice
+from app.services import local_emotion
+from starlette.concurrency import run_in_threadpool
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_models()
+    if settings.EMOTION_PROVIDER in ("local", "google"):
+        try:  # download/load the emotion models now so the first request is fast
+            await run_in_threadpool(local_emotion.load)
+        except Exception as e:  # the server still starts; /emotion reports the error
+            print(f"[emotion] could not load the local model: {e}")
     yield
 
 

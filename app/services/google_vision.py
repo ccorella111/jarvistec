@@ -1,5 +1,8 @@
 """Facial emotion with Google Cloud Vision (face detection).
 
+DEPRECATED BY GOOGLE (2026-10-15): face detection now returns UNKNOWN for every emotion, so this
+provider is kept only for reference. Use EMOTION_PROVIDER=local (app/services/local_emotion.py).
+
 Vision does NOT return percentages: it returns a likelihood level (VERY_UNLIKELY..VERY_LIKELY) for
 4 emotions: joy, surprise, anger and sorrow. "neutral" is inferred when none reaches POSSIBLE.
 Names are returned in Azure style (happiness, sadness, anger, surprise, neutral).
@@ -17,6 +20,9 @@ _client = None
 
 
 def _summarize(face) -> dict:
+    if all(int(getattr(face, field)) == 0 for field, _ in FIELDS):
+        return {"emotion": None, "confidence": 0.0, "unavailable": True,
+                "note": "Google Vision no longer returns emotions (deprecated 2026-10-15)"}
     details = {name: LEVEL[int(getattr(face, field))] for field, name in FIELDS}
     top = max(details, key=details.get)
     if details[top] < 0.5:

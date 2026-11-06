@@ -16,9 +16,8 @@ MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "NAME.joblib"
 META = {
     "name": "NAME",
     "description": "What this model predicts",
-    "keywords": ["phrase 1", "phrase 2"],        # whole-word matches against the spoken command
+    "keywords": ["phrase 1", "phrase 2"],     
     "example_input": {"column1": 0.0, "column2": 0.0},
-    # Optional: "extract_input": function(text) -> dict | None   (reads values out of the spoken phrase)
 }
 
 _model = None

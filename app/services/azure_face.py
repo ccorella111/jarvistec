@@ -1,9 +1,4 @@
-"""Reconocimiento de emoción con Azure Face (primera entrega).
-
-OJO: Microsoft retiró el atributo `emotion` para clientes nuevos (Limited Access).
-Si su recurso devuelve error 403/400 con ese atributo, consulten al profesor y usen
-la alternativa de Google Cloud Vision (face detection: joy/sorrow/anger/surprise).
-Mientras tanto USE_MOCK=true permite desarrollar la interfaz sin claves.
+"""Reconocimiento de emoción con Azure Face.
 """
 import httpx
 

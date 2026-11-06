@@ -1,7 +1,4 @@
 """Command interpretation: spoken phrase -> model.
-
-Simple keyword version. A possible upgrade: replace it with an intent classifier
-(TF-IDF + logistic regression).
 """
 from predictors._common import has, normalize
 
